@@ -2,7 +2,7 @@ const sheetMovements = SpreadsheetApp.getActive().getSheetByName("Movements");
 const sheetLog = SpreadsheetApp.getActive().getSheetByName("log");
 
 let boxes;
-let answer;
+let message;
 let boxesOptions;
 const movesUrl = "https://potapovka-sport.ru/movements";
 const headers = { "Content-Type": "Application/json" };
@@ -19,11 +19,15 @@ function movements() {
   sendParcels(movesUrl, boxesOptions);
 
   boxes.forEach((box) => {
-    log(box, answer);
+    log(box, message);
   });
 }
 
 function createBoxes() {
+  const lastRow = sheetLog.getLastRow();
+  const lastID = sheetLog.getRange(lastRow, 1).getValue();
+  const boxId = !isNaN(lastID) ? lastID + 1 : 1;
+
   let boxNumbers = sheetMovements.getRange(2, 1, 1000).getValues();
   boxNumbers = [...new Set(boxNumbers.join().split(",").filter(Boolean))];
 
@@ -36,6 +40,7 @@ function createBoxes() {
 
   boxes = boxNumbers.map((boxNumber) => {
     return {
+      id: boxId,
       boxNumber: boxNumber,
       storeName: sheetMovements.getRange(1, 5).getValue(),
       incomeId: sheetMovements.getRange(1, 7).getValue(),
@@ -61,22 +66,25 @@ function sendParcels(url, options) {
 
   if (response.getResponseCode() === 200) {
     SpreadsheetApp.getUi().alert("Всё перемещено!");
-    answer = "Успех";
-    sheetMovements.getRange(2, 1, 1000).clearContent();
+    /* sheetMovements.getRange(2, 1, 1000).clearContent();
     sheetMovements.getRange(1, 5).clearContent();
     sheetMovements.getRange(1, 7).clearContent();
-    sheetMovements.getRange(1, 9).clearContent();
+    sheetMovements.getRange(1, 9).clearContent(); */
   } else {
     data = response.getContentText();
-    SpreadsheetApp.getUi().alert(JSON.parse(data)["error"]);
-    answer = "Ошибка";
+    try {
+      message = JSON.parse(data)["error"];
+    } catch {
+      message = "Неизвестная ошибка";
+    }
+    SpreadsheetApp.getUi().alert(message);
   }
 }
 
 function log(parcel, comment) {
   const lastRow = sheetLog.getLastRow();
   const nowDate = new Date();
-  sheetLog.getRange(lastRow + 1, 1).setValue(lastRow);
+  sheetLog.getRange(lastRow + 1, 1).setValue(parcel.id);
   sheetLog.getRange(lastRow + 1, 2).setValue(nowDate);
   sheetLog.getRange(lastRow + 1, 3).setValue(parcel.boxNumber);
   sheetLog.getRange(lastRow + 1, 4).setValue(parcel.storeName);
