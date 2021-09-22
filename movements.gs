@@ -14,7 +14,7 @@ const parcel = {
   storeName: storeNameRange.getValue(),
   incomeId: incomeIdRange.getValue(),
   movementDate: movementDateRange.getValue(),
-  movesUrl: 'https://potapovka-sport.ru/movement'
+  movesUrl: 'https://potapovka-sport.ru/movements'
 }
 
 function onOpen(e) {
@@ -80,22 +80,23 @@ class movementData {
     const response = UrlFetchApp.fetch(this._movesUrl, this._options);
 
     if (response.getResponseCode() === 200) {
-      SpreadsheetApp.getUi().alert('Всё перемещено!');
       clearRanges()
-      this._message = 'OK'
+      this._message = 'Всё перемещено!'
     }
     else {
       const data = response.getContentText()
       try {
         this._message = JSON.parse(data)['error'];
+        
       } catch {
         this._message = "Неизвестная ошибка"
       }
-      SpreadsheetApp.getUi().alert(this._message);
     }
-
     this._log(executionDate, this._message)
+    SpreadsheetApp.getUi().alert(this._message);
+    
   }
 }
 
 const movementBoxes = new movementData(parcel)
+
