@@ -1,60 +1,102 @@
-function onOpen(e)
-{
+const sheetMovements = SpreadsheetApp.getActive().getSheetByName("Movements");
+const sheetLog = SpreadsheetApp.getActive().getSheetByName("log");
+
+const boxNumbersRange = sheetMovements.getRange(2, 1, 1000);
+const storeNameRange = sheetMovements.getRange(1, 5);
+const incomeIdRange = sheetMovements.getRange(1, 7);
+const movementDateRange = sheetMovements.getRange(1, 9);
+
+let boxNumbers = boxNumbersRange.getValues();
+boxNumbers = [...new Set(boxNumbers.join().split(',').filter(Boolean))];
+
+const parcel = {
+  boxNumbers: boxNumbers,
+  storeName: storeNameRange.getValue(),
+  incomeId: incomeIdRange.getValue(),
+  movementDate: movementDateRange.getValue(),
+  movesUrl: 'https://potapovka-sport.ru/movements'
+}
+
+function onOpen(e) {
   SpreadsheetApp.getUi()
     .createMenu('Действия')
-    .addItem('Переместить', 'movements')
+    .addItem('Переместить', 'movementBoxes.sendParcel')
     .addToUi();
 }
 
-function movements(){
-  var sheet = SpreadsheetApp
-               .getActive()
-               .getSheetByName("Movements")
+function clearRanges() {
+  boxNumbersRange.clearContent();
+  storeNameRange.clearContent();
+  incomeIdRange.clearContent();
+  movementDateRange.clearContent();
+}
 
-  var box_numbers_range = sheet
-               .getRange(2,1,1000);
-  var box_numbers = box_numbers_range.getValues();
-  box_numbers = [...new Set(box_numbers.join().split(',').filter(Boolean))];
-
-  if (box_numbers.length > 100){
-    SpreadsheetApp.getUi().alert('Нельзя двигать больше 100 коробов за раз - сервак лопнет :)');
-    return;
+class movementData {
+  constructor(shipment) {
+    this._boxNubmers = shipment.boxNumbers;
+    this._storeName = shipment.storeName;
+    this._movementDate = shipment.movementDate;
+    this._incomeId = shipment.incomeId;
+    this._movesUrl = shipment.movesUrl;
+    this._message = '';
+    this._options = {
+      'method': 'put',
+      'payload': JSON.stringify({
+        "store_name": shipment.storeName,
+        "income_id": shipment.incomeId,
+        "movement_date": shipment.movementDate,
+        "box_numbers": shipment.boxNumbers
+      }),
+      'headers': { 'Content-Type': 'Application/json' },
+      'muteHttpExceptions': true,
+    }
   }
 
-  var store_name_range = sheet
-               .getRange(1,5);
-  var store_name = store_name_range.getValue()
-  var income_id_range = sheet
-               .getRange(1,7);
-  var income_id = income_id_range.getValue()
-  var movement_date_range = sheet
-               .getRange(1,9);
-  var movement_date = movement_date_range.getValue()
+  _log(date, message) {
+    const lastRowNumber = sheetLog.getLastRow();
+    const logId = sheetLog.getRange(lastRowNumber, 1).getValue();
+    const shipmentId = !isNaN(logId) ? logId + 1 : 1;
 
-  let moves_url = 'https://potapovka-sport.ru/movements';
-  let headers = {"Content-Type": `Application/json`};
-  
-  var options = {
-  'method' : 'put',
-  'payload' : JSON.stringify({
-    "store_name": store_name,
-    "income_id": income_id,
-    "movement_date": movement_date,
-    "box_numbers": box_numbers
-  }),
-  'headers':headers,
-  'muteHttpExceptions': true,
+    const boxNubmerArrays = this._boxNubmers.map((boxNubmer) => {
+      return [boxNubmer]
+    });
+
+    sheetLog.getRange(lastRowNumber + 1, 1, this._boxNubmers.length).setValue(shipmentId)
+    sheetLog.getRange(lastRowNumber + 1, 2, this._boxNubmers.length).setValue(date)
+    sheetLog.getRange(lastRowNumber + 1, 3, this._boxNubmers.length).setValues(boxNubmerArrays)
+    sheetLog.getRange(lastRowNumber + 1, 4, this._boxNubmers.length).setValue(this._storeName)
+    sheetLog.getRange(lastRowNumber + 1, 5, this._boxNubmers.length).setValue(this._movementDate)
+    sheetLog.getRange(lastRowNumber + 1, 6, this._boxNubmers.length).setValue(this._incomeId)
+    sheetLog.getRange(lastRowNumber + 1, 7, this._boxNubmers.length).setValue(message)
+  }
+
+  sendParcel() {
+    if (this._boxNubmers.length > 100) {
+      SpreadsheetApp.getUi().alert('Нельзя двигать больше 100 коробов за раз - сервак лопнет :)');
+      return;
+    }
+
+    const executionDate = new Date();
+    const response = UrlFetchApp.fetch(this._movesUrl, this._options);
+
+    if (response.getResponseCode() === 200) {
+      clearRanges()
+      this._message = 'Всё перемещено!'
+    }
+    else {
+      const data = response.getContentText()
+      try {
+        this._message = JSON.parse(data)['error'];
+        
+      } catch {
+        this._message = "Неизвестная ошибка"
+      }
+    }
+    this._log(executionDate, this._message)
+    SpreadsheetApp.getUi().alert(this._message);
+    
+  }
 }
-let response = UrlFetchApp.fetch(moves_url, options=options);
-if (response.getResponseCode() == 200){
-  SpreadsheetApp.getUi().alert('Всё перемещено!');
-  box_numbers_range.clearContent();
-  income_id_range.clearContent();
-  movement_date_range.clearContent();
-  store_name_range.clearContent();
-}
-else{
-  data = response.getContentText()
-  SpreadsheetApp.getUi().alert(JSON.parse(data)['error']);
-}
-}
+
+const movementBoxes = new movementData(parcel)
+
