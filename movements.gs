@@ -8,10 +8,10 @@ const incomeIdRange = sheetMovements.getRange(1, 7);
 const movementDateRange = sheetMovements.getRange(1, 9);
 
 let boxNumbers = boxNumbersRange.getValues();
-boxNumbers = [...boxNumbers.join().split(',')].filter(function (e) { return e != ''; });
+boxNumbers = [...boxNumbers.join().split(',')].filter(function (e) {return e != '';});
 
 let boxBarcodes = boxBarcodesRange.getValues();
-boxBarcodes = [...boxBarcodes.join().split(',')].filter(function (e) { return e != ''; });
+boxBarcodes = [...boxBarcodes.join().split(',')].filter(function (e) {return e != '';});
 
 const parcel = {
   boxNumbers: boxNumbers,
@@ -60,6 +60,7 @@ class movementData {
   }
 
   _validate() {
+    const lastCell = sheetMovements.getLastRow();
     const badArray = [
       this._boxNubmers,
       this._boxBarcodes,
@@ -71,27 +72,22 @@ class movementData {
     this._message = 'Не все поля заполнены!'
 
     let error = badArray.every((item) => {
-      return item !== '' && item > []
+      return item !== '' && item > [];
     })
 
-    if (this._boxNubmers.length > this._boxBarcodes.length) {
-      for (let i = 0; i < this._boxNubmers.length; i++) {
-        const value = sheetMovements.getRange(2 + i, 2).getValue();
-        if (value !== '') continue
-        const boxNumber = sheetMovements.getRange(2 + i, 1).getValue();
-        this._message = `Не указан штрих-код у коробки под номером: ${boxNumber}`
-        break
+    for (let i = 0; i <= lastCell; i++) {
+      const boxNumber = sheetMovements.getRange(2+i, 1).getValue();
+      const barCode = sheetMovements.getRange(2+i, 2).getValue();
+      if (barCode === '' && boxNumber === '') continue;
+      if (barCode === '') {
+        this._message = `Не указан штрих-код у коробки под номером: ${boxNumber}`;
+        error = false;
+        break;
+      } else if (boxNumber === '') {
+        this._message = `Не указан номер коробки у штрих-кода под номером: ${barCode}`;
+        error = false;
+        break;
       }
-      error = false;
-    } else if (this._boxNubmers.length < this._boxBarcodes.length) {
-      for (let i = 0; i < this._boxBarcodes.length; i++) {
-        const value = sheetMovements.getRange(2 + i, 1).getValue();
-        if (value !== '') continue
-        const barCodeNumber = sheetMovements.getRange(2 + i, 2).getValue();
-        this._message = `Не указан номер коробки у штрих-кода под номером: ${barCodeNumber}`
-        break
-      }
-      error = false;
     }
 
     return error;
